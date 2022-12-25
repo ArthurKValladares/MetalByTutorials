@@ -44,3 +44,39 @@ fragment float4 fragment_main() {
 let library = try device.makeLibrary(source: shader, options: nil)
 let vertexFunction = library.makeFunction(name: "vertex_main")
 let fragmentFunction = library.makeFunction(name: "fragment_main")
+
+let pipelineDescriptor = MTLRenderPipelineDescriptor()
+pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+pipelineDescriptor.vertexFunction = vertexFunction
+pipelineDescriptor.fragmentFunction = fragmentFunction
+pipelineDescriptor.vertexDescriptor = MTKMetalVertexDescriptorFromModelIO(mesh.vertexDescriptor)
+
+let pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
+
+guard let commandBuffer = commandQueue.makeCommandBuffer(),
+      let renderPassDescriptor = view.currentRenderPassDescriptor,
+      let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+    fatalError("Could not create render pass structures")
+}
+
+renderEncoder.setRenderPipelineState(pipelineState)
+renderEncoder.setVertexBuffer(mesh.vertexBuffers[0].buffer, offset: 0, index: 0)
+
+guard let submesh = mesh.submeshes.first else {
+    fatalError("Mesh with no submeshes")
+}
+
+renderEncoder.drawIndexedPrimitives(type: .triangle,
+                                    indexCount: submesh.indexCount,
+                                    indexType: submesh.indexType,
+                                    indexBuffer: submesh.indexBuffer.buffer,
+                                    indexBufferOffset: 0)
+renderEncoder.endEncoding()
+guard let drawable = view.currentDrawable else {
+    fatalError("no current drawable")
+}
+commandBuffer.present(drawable)
+commandBuffer.commit()
+
+PlaygroundPage.current.liveView = view
+
